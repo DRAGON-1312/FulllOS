@@ -1,5 +1,13 @@
 struct stat;
 
+struct procinfo {
+  int pid;  // process ID
+  int ppid; // parent process ID
+  int state; // process state
+  uint64 sz; // size of process memory
+  char name[16]; // process name
+};
+
 // system calls
 int fork(void);
 int exit(int) __attribute__((noreturn));
@@ -22,6 +30,8 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int trace(int);
+int procinfo(int pid, struct procinfo *info);
 
 // ulib.c
 int stat(const char*, struct stat*);

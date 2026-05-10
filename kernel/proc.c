@@ -325,6 +325,8 @@ fork(void)
   np->state = RUNNABLE;
 
   release(&np->lock);
+  
+  np->trace_mask = p->trace_mask; // Inherit trace mask from parent. (For TRACING syscall)
 
   return pid;
 }
@@ -704,5 +706,66 @@ procdump(void)
   }
 }
 
+int
+getprocinfo(int pid, uint64 uaddr)
+{
+  struct proc *p;
+  struct procinfo info;
+  int found = 0;
 
+  /*
+   * Use wait_lock first because the parent-child relationship
+   * is protected by wait_lock in xv6.
+   *
+   * If we need both wait_lock and p->lock, we acquire wait_lock
+   * before p->lock to keep the lock order consistent with xv6.
+   */
+  acquire(&wait_lock);
 
+  // Traverse the process table to find the process with the given PID.
+  for(p = proc; p < &proc[NPROC]; p++){
+    /*
+     * Hold p->lock while reading fields of this process.
+     * This prevents reading inconsistent process information.
+     */
+    acquire(&p->lock);
+
+    if(p->state != UNUSED && p->pid == pid){
+      // Copy thông tin từ struct proc sang struct procinfo
+      info.pid = p->pid;
+      info.state = p->state;
+      info.sz = p->sz;
+      safestrcpy(info.name, p->name, sizeof(info.name));
+
+      /*
+       * p->parent is protected by wait_lock.
+       * If the process has no parent, return 0 as the parent PID.
+       */
+      info.ppid = (p->parent ? p->parent->pid : 0);
+
+      found = 1;
+
+      release(&p->lock); // Thả p->lock, thoát vòng lặp
+      break;
+    }
+
+    // Sau khi đã copy đủ thông tin vào info, không cần giữ p->lock nữa.
+    release(&p->lock); // Thả p->lock, thoát vòng lặp
+  }
+
+  // Sau khi đã đọc xong p->parent, có thể thả wait_lock
+  release(&wait_lock);
+
+  if(!found)
+    return -1;
+
+  /*
+   * Copy the collected information back to user space.
+   * Do this after releasing kernel locks, because copyout() accesses
+   * the user page table and should not be done while holding locks.
+   */
+  if(copyout(myproc()->pagetable, uaddr, (char *)&info, sizeof(info)) < 0)
+    return -1;
+
+  return 0;
+}

@@ -101,31 +101,61 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
+extern uint64 sys_trace(void);
+extern uint64 sys_procinfo(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
 static uint64 (*syscalls[])(void) = {
-[SYS_fork]    sys_fork,
-[SYS_exit]    sys_exit,
-[SYS_wait]    sys_wait,
-[SYS_pipe]    sys_pipe,
-[SYS_read]    sys_read,
-[SYS_kill]    sys_kill,
-[SYS_exec]    sys_exec,
-[SYS_fstat]   sys_fstat,
-[SYS_chdir]   sys_chdir,
-[SYS_dup]     sys_dup,
-[SYS_getpid]  sys_getpid,
-[SYS_sbrk]    sys_sbrk,
-[SYS_sleep]   sys_sleep,
-[SYS_uptime]  sys_uptime,
-[SYS_open]    sys_open,
-[SYS_write]   sys_write,
-[SYS_mknod]   sys_mknod,
-[SYS_unlink]  sys_unlink,
-[SYS_link]    sys_link,
-[SYS_mkdir]   sys_mkdir,
-[SYS_close]   sys_close,
+  [SYS_fork]    sys_fork,
+  [SYS_exit]    sys_exit,
+  [SYS_wait]    sys_wait,
+  [SYS_pipe]    sys_pipe,
+  [SYS_read]    sys_read,
+  [SYS_kill]    sys_kill,
+  [SYS_exec]    sys_exec,
+  [SYS_fstat]   sys_fstat,
+  [SYS_chdir]   sys_chdir,
+  [SYS_dup]     sys_dup,
+  [SYS_getpid]  sys_getpid,
+  [SYS_sbrk]    sys_sbrk,
+  [SYS_sleep]   sys_sleep,
+  [SYS_uptime]  sys_uptime,
+  [SYS_open]    sys_open,
+  [SYS_write]   sys_write,
+  [SYS_mknod]   sys_mknod,
+  [SYS_unlink]  sys_unlink,
+  [SYS_link]    sys_link,
+  [SYS_mkdir]   sys_mkdir,
+  [SYS_close]   sys_close,
+  [SYS_trace]   sys_trace,
+  [SYS_procinfo] sys_procinfo,
+};
+
+static char *syscallnames[] = { // syscall name to print later (For TRACING syscall)
+  [SYS_fork]    "fork",
+  [SYS_exit]    "exit",
+  [SYS_wait]    "wait",
+  [SYS_pipe]    "pipe",
+  [SYS_read]    "read",
+  [SYS_kill]    "kill",
+  [SYS_exec]    "exec",
+  [SYS_fstat]   "fstat",
+  [SYS_chdir]   "chdir",
+  [SYS_dup]     "dup",
+  [SYS_getpid]  "getpid",
+  [SYS_sbrk]    "sbrk",
+  [SYS_sleep]   "sleep",
+  [SYS_uptime]  "uptime",
+  [SYS_open]    "open",
+  [SYS_write]   "write",
+  [SYS_mknod]   "mknod",
+  [SYS_unlink]  "unlink",
+  [SYS_link]    "link",
+  [SYS_mkdir]   "mkdir",
+  [SYS_close]   "close",
+  [SYS_trace]   "trace",
+  [SYS_procinfo] "procinfo",
 };
 
 void
@@ -134,11 +164,24 @@ syscall(void)
   int num;
   struct proc *p = myproc();
 
-  num = p->trapframe->a7;
+  // Trong xv6 RISC-V, khi user program gọi syscall, số hiệu syscall được đặt trong thanh ghi a7
+  num = p->trapframe->a7; // lấy syscall number mà process đang yêu cầu gọi
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // Use num to lookup the system call function for num, call it,
     // and store its return value in p->trapframe->a0
     p->trapframe->a0 = syscalls[num]();
+
+    // Nếu bit tương ứng với syscall hiện tại trong trace_mask của process hiện tại đang được bật
+    if(p->trace_mask & (1 << num)) { // added for TRACING syscall
+      // means if the n-th bit of trace_mask is set 
+      // and the corresponding system call is called,
+      // then print the information about that system call.
+      printf("%d: syscall %s -> %ld\n",
+              p->pid,
+              syscallnames[num],
+              p->trapframe->a0);
+    }
+
   } else {
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);

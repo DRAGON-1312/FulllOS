@@ -91,3 +91,29 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_trace(void)
+{
+  int mask;
+  argint(0, &mask); // lấy argument đầu tiên từ user space
+  myproc()->trace_mask = mask; // lưu mask đó vào process hiện tại
+  return 0; // báo syscall thành công
+}
+
+uint64
+sys_procinfo(void)
+{
+  int pid;
+  uint64 addr;
+
+  // Lấy argument thứ nhất từ user space: pid của process cần truy vấn
+  argint(0, &pid);
+  
+  // Lấy argument thứ hai từ user space: địa chỉ struct procinfo trong user program
+  argaddr(1, &addr);
+
+  // Gọi hàm xử lý chính trong kernel để lấy thông tin process
+  // và copy kết quả về địa chỉ user space bằng copyout()
+  return getprocinfo(pid, addr);
+}

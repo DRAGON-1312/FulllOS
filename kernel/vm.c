@@ -488,9 +488,41 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 
 #ifdef LAB_PGTBL
+// task2
+static void
+vmprint_walk(pagetable_t pagetable, int depth)
+{
+  // Mỗi page table page có 512 PTE
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+
+    // Chỉ in PTE hợp lệ
+    if(pte & PTE_V){
+      uint64 pa = PTE2PA(pte);
+
+      for(int j = 0; j < depth; j++){
+        printf(" ..");
+      }
+
+      // format: indent + index + pte + pa
+      printf("%d: pte %p pa %p\n", i, (void *)pte, (void *)pa);
+
+      // Không có R/W/X  → non-leaf → trỏ đến page table con
+      // Có R hoặc W hoặc X → leaf → trỏ tới page dữ liệu/code thật
+      if((pte & (PTE_R | PTE_W | PTE_X)) == 0){
+        // Nếu là non-leaf thì pa chính là địa chỉ của page table cấp dưới
+        vmprint_walk((pagetable_t)pa, depth + 1);
+      }
+    }
+  }
+}
+
+
 void
 vmprint(pagetable_t pagetable) {
   // your code here
+  printf("page table %p\n", pagetable);
+  vmprint_walk(pagetable, 1);
 }
 #endif
 
